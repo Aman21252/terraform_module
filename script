@@ -1,0 +1,74 @@
+resource "aws_iam_role" "image_builder_role" {
+  name = "image-builder-lifecycle-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "image_builder_policy" {
+  role       = aws_iam_role.image_builder_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+}
+
+resource "aws_imagebuilder_image_pipeline" "golden_image_pipeline" {
+  name                            = "ECP-Golden-Images-Pipeline"
+  image_recipe_arn                = aws_imagebuilder_image_recipe.golden_image_recipe.arn
+  infrastructure_configuration_arn = aws_imagebuilder_infrastructure_configuration.image_builder_config.arn
+
+  # Define the image lifecycle schedule
+  schedule {
+    schedule_expression = "cron(0 12 * * ? *)" # Adjust the schedule as needed
+  }
+}
+
+resource "aws_dlm_lifecycle_policy" "golden_image_ami_lifecycle" {
+  description        = "Lifecycle policy for ECP Golden Images AMIs"
+  execution_role_arn = aws_iam_role.image_builder_role.arn
+
+  policy_details {
+    resource_types = ["IMAGE"]
+
+    # Target AMIs by tag
+    target_tags = {
+      "Purpose" = "ECP-Golden-Images"
+    }
+
+    # Deprecate after 2 days, disable after 5 days, delete after 8 days
+    schedules {
+      name = "ECP Golden Image Lifecycle"
+
+      # AMI Deprecation
+      create_rule {
+        interval      = 1
+        interval_unit = "DAYS"
+      }
+
+      retain_rule {
+        count = 1
+      }
+
+      deprecation_rule {
+        interval      = 2
+        interval_unit = "DAYS"
+      }
+
+      # Disable usage after 5 days (requires additional logic in AWS SDK or Lambda)
+      # To disable an AMI, you may need to create a custom Lambda function
+
+      delete_rule {
+        interval      = 8
+        interval_unit = "DAYS"
+      }
+    }
+  }
+}
