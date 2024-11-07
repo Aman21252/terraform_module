@@ -81,3 +81,26 @@ variable "recipe_version" {
   type        = string
   default     = "1.0.0"
 }
+
+variable "recipes" {
+  description = "A list of recipes, each with a name and semantic version"
+  type = list(object({
+    name    = string
+    version = string
+  }))
+  default = [
+    {
+      name    = "recipe1"
+      version = "1.0.0"
+    },
+    {
+      name    = "recipe2"
+      version = "1.0.1"
+    },
+    {
+      name    = "recipe3"
+      version = "1.0.2"
+    }
+  ]
+}
+
