@@ -1,50 +1,71 @@
-data "aws_iam_role" "GoldenServiceRoleForImageBuilder" {
-  name = var.iam_role_name
+resource "aws_iam_role" "GoldenServiceRoleForImageBuilder" {
+  name = var.imagebuilder_role_name
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = {
+          Service = "imagebuilder.amazonaws.com"
+        }
+        Action   = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "EC2ImageBuilderLifecycleExecutionPolicy" {
+  role       = aws_iam_role.GoldenServiceRoleForImageBuilder.name
+  policy_arn = var.imagebuilder_policy_arn
 }
 
 resource "aws_imagebuilder_lifecycle_policy" "lifecycle" {
-  name            = var.policy_name
-  description     = var.policy_description
-  execution_role  = data.aws_iam_role.GoldenServiceRoleForImageBuilder.arn
-  resource_type   = var.resource_type
+  name            = var.lifecycle_policy_name
+  description     = var.lifecycle_policy_description
+  execution_role  = aws_iam_role.GoldenServiceRoleForImageBuilder.arn
+  resource_type   = "AMI_IMAGE"
 
   policy_detail {
     action {
-      type = var.deprecate_action
+      type = "DEPRECATE"
     }
     filter {
-      type  = var.filter_type
-      value = var.deprecate_age_value
-      unit  = var.age_unit
+      type  = "AGE"
+      value = var.deprecate_age
+      unit  = "DAYS"
     }
   }
 
   policy_detail {
     action {
-      type = var.disable_action
+      type = "DISABLE"
     }
     filter {
-      type  = var.filter_type
-      value = var.disable_age_value
-      unit  = var.age_unit
+      type  = "AGE"
+      value = var.disable_age
+      unit  = "DAYS"
     }
   }
 
   policy_detail {
     action {
-      type = var.delete_action
+      type = "DELETE"
     }
     filter {
-      type  = var.filter_type
-      value = var.delete_age_value
-      unit  = var.age_unit
+      type  = "AGE"
+      value = var.delete_age
+      unit  = "DAYS"
     }
   }
 
   resource_selection {
-    recipe {
-      name             = var.recipe_name
-      semantic_version = var.recipe_version
+    dynamic "recipe" {
+      for_each = var.image_recipes
+      content {
+        name             = recipe.value.name
+        semantic_version = recipe.value.semantic_version
+      }
     }
   }
 }
